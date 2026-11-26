@@ -72,8 +72,8 @@ pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:4px 0}
 var SUPABASE_URL = 'https://dsumoijsbbtghtcfuqic.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_CQruiFI-fBB8t1VCeK5ScQ_IMP_F7UM';
 
-var CFG_KEY='kampung_terpadu_sb_cfg',TAB_KEY='kampung_terpadu_tab';
-var sb=null,U=null,TAB='beranda',MENU=false,SHARE=null,EDIT=null,MSG='',MSG_OK=false,AUTH_MODE='login',BUSY=false,CFG_OPEN=false;
+var CFG_KEY='kampung_terpadu_sb_cfg',TAB_KEY='kampung_terpadu_tab',DEMO_KEY='kampung_terpadu_demo_v1';
+var sb=null,U=null,TAB='beranda',MENU=false,SHARE=null,EDIT=null,MSG='',MSG_OK=false,AUTH_MODE='login',BUSY=false,CFG_OPEN=false,DEMO=false;
 var D={kk:[],kas:[],ronda:[],pinjam:[],info:[],profiles:[]};
 var HARI=['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
 var KF={from:'',to:''};
@@ -84,6 +84,72 @@ var PAPERS={
  Letter:{label:'Letter (216 × 279 mm)',w:215.9,h:279.4},
  A5:{label:'A5 (148 × 210 mm)',w:148,h:210}
 };
+
+function demoSeed(){
+ return{
+  _seq:{kk:8,kas:6,ronda:14,pinjam:3,info:2},
+  kk:[
+   {id:1,nama:'Bpk. Slamet Riyadi',blok:'A1',hp:'6281234500001'},
+   {id:2,nama:'Bpk. Agus Santoso',blok:'A2',hp:'6281234500002'},
+   {id:3,nama:'Bpk. Budi Hartono',blok:'A3',hp:'6281234500003'},
+   {id:4,nama:'Bpk. Wahyu Nugroho',blok:'B1',hp:'6281234500004'},
+   {id:5,nama:'Bpk. Dedi Kurniawan',blok:'B2',hp:'6281234500005'},
+   {id:6,nama:'Bpk. Joko Susilo',blok:'B3',hp:'6281234500006'},
+   {id:7,nama:'Ibu Siti Aminah',blok:'C1',hp:'6281234500007'},
+   {id:8,nama:'Bpk. Hendra Wijaya',blok:'C2',hp:'6281234500008'}
+  ],
+  kas:[
+   {id:6,tgl:'2026-11-22',ket:'Iuran kebersihan & keamanan Nov',jenis:'masuk',jml:600000},
+   {id:5,tgl:'2026-11-20',ket:'Sumbangan acara warga',jenis:'masuk',jml:300000},
+   {id:4,tgl:'2026-11-16',ket:'Perbaikan gerbang pos ronda',jenis:'keluar',jml:250000},
+   {id:3,tgl:'2026-11-12',ket:'Kerja bakti (konsumsi warga)',jenis:'keluar',jml:200000},
+   {id:2,tgl:'2026-11-05',ket:'Beli lampu LED pos ronda',jenis:'keluar',jml:150000},
+   {id:1,tgl:'2026-11-01',ket:'Iuran kas warga November',jenis:'masuk',jml:800000}
+  ],
+  ronda:[
+   {id:1,hari:'Senin',kk_id:1},{id:2,hari:'Senin',kk_id:2},
+   {id:3,hari:'Selasa',kk_id:3},{id:4,hari:'Selasa',kk_id:4},
+   {id:5,hari:'Rabu',kk_id:5},{id:6,hari:'Rabu',kk_id:6},
+   {id:7,hari:'Kamis',kk_id:7},{id:8,hari:'Kamis',kk_id:8},
+   {id:9,hari:'Jumat',kk_id:1},{id:10,hari:'Jumat',kk_id:3},
+   {id:11,hari:'Sabtu',kk_id:2},{id:12,hari:'Sabtu',kk_id:5},
+   {id:13,hari:'Minggu',kk_id:4},{id:14,hari:'Minggu',kk_id:6}
+  ],
+  pinjam:[
+   {id:1,kk_id:2,tgl:'2026-08-10',pokok:2000000,tenor:10,bunga:0,bayar:3},
+   {id:2,kk_id:5,tgl:'2026-09-15',pokok:1500000,tenor:6,bunga:5,bayar:2},
+   {id:3,kk_id:7,tgl:'2026-10-05',pokok:1000000,tenor:5,bunga:0,bayar:4}
+  ],
+  info:[
+   {id:2,judul:'Rapat Pengurus & Warga RT 03',isi:'Undangan rapat evaluasi kas bulanan dan rencana kerja bakti pada Sabtu malam pukul 19.30 di Balai RT.',tgl:'2026-11-25'},
+   {id:1,judul:'Kerja Bakti Minggu Pagi',isi:'Kerja bakti membersihkan selokan hari Minggu pukul 06.30 di depan pos ronda. Harap membawa cangkul/sapu.',tgl:'2026-11-24'}
+  ],
+  profiles:[
+   {id:'demo-admin',email:'ketua-rt@demo.id',nama:'Ketua RT (Demo)',role:'super_admin',kk_id:1},
+   {id:'demo-warga',email:'warga@demo.id',nama:'Bpk. Slamet Riyadi (Demo)',role:'viewer',kk_id:1}
+  ]
+ };
+}
+function loadDemoData(){
+ try{var raw=localStorage.getItem(DEMO_KEY);if(raw){var p=JSON.parse(raw);if(p&&Array.isArray(p.kk)&&Array.isArray(p.kas)){if(!p._seq)p._seq={kk:99,kas:99,ronda:99,pinjam:99,info:99};return p}}}catch(e){}
+ return demoSeed();
+}
+function saveDemoData(){if(!DEMO)return;try{localStorage.setItem(DEMO_KEY,JSON.stringify(D))}catch(e){}}
+function demoNid(k){if(!D._seq)D._seq={kk:99,kas:99,ronda:99,pinjam:99,info:99};D._seq[k]=(Number(D._seq[k])||0)+1;return D._seq[k]}
+function startDemo(role){
+ DEMO=true;D=loadDemoData();
+ U=role==='super_admin'
+  ?{id:'demo-admin',email:'ketua-rt@demo.id',nama:'Ketua RT (Demo)',role:'super_admin',kk_id:1}
+  :{id:'demo-warga',email:'warga@demo.id',nama:'Warga RT 03 (Demo)',role:'viewer',kk_id:1};
+ TAB='beranda';EDIT=null;SHARE=null;MENU=false;
+ setMsg('Mode Demo aktif (menggunakan data dummy lokal, tidak mengubah database asli).',true);
+ render();window.scrollTo(0,0);
+}
+function resetDemoLocal(){
+ if(!confirm('Kembalikan semua data dummy demo ke awal?'))return;
+ D=demoSeed();saveDemoData();EDIT=null;SHARE=null;
+ setMsg('Data dummy demo dikembalikan ke awal.',true);render();
+}
 
 function getCfg(){
  var u=SUPABASE_URL,k=SUPABASE_ANON_KEY;
@@ -173,6 +239,7 @@ async function loadAll(){
 }
 
 async function refreshData(){
+ if(DEMO){D=loadDemoData();setMsg('Data dummy demo dimuat ulang.',true);render();return}
  if(!sb||!U)return;
  BUSY=true;clearMsg();render();
  try{await loadAll();setMsg('Data berhasil diperbarui.',true)}
@@ -211,8 +278,8 @@ async function doAuth(){
 }
 
 async function logout(){
- if(sb){try{await sb.auth.signOut()}catch(e){}}
- U=null;SHARE=null;MENU=false;EDIT=null;D={kk:[],kas:[],ronda:[],pinjam:[],info:[],profiles:[]};
+ if(!DEMO&&sb){try{await sb.auth.signOut()}catch(e){}}
+ DEMO=false;U=null;SHARE=null;MENU=false;EDIT=null;D={kk:[],kas:[],ronda:[],pinjam:[],info:[],profiles:[]};
  clearMsg();render();
 }
 
@@ -225,11 +292,12 @@ function render(){
  var tabs=[['beranda','Beranda'],['kas','Kas RT'],['ronda','Jadwal Ronda'],['pinjam','Simpan Pinjam'],['info','Informasi']];
  if(A())tabs.push(['db','Database']);
  var viewFn={beranda:vBeranda,kas:vKas,ronda:vRonda,pinjam:vPinjam,info:vInfo,db:vDb}[TAB]||vBeranda;
- var h='<div class="top"><div><h1>🏘️ Kampung Terpadu</h1><span class="mut">RT 03 / RW 05 · Tersinkron Supabase</span></div><div style="display:flex;gap:6px"><button class="burger" title="Segarkan" aria-label="Segarkan" onclick="refreshData()"'+(BUSY?' disabled':'')+'>↻</button><button class="burger" aria-label="Menu" onclick="toggleMenu()">☰</button></div></div>';
+ var h='<div class="top"><div><h1>🏘️ Kampung Terpadu</h1><span class="mut">RT 03 / RW 05 · '+(DEMO?'Mode Demo (Data Dummy Lokal)':'Tersinkron Supabase')+'</span></div><div style="display:flex;gap:6px"><button class="burger" title="Segarkan" aria-label="Segarkan" onclick="refreshData()"'+(BUSY?' disabled':'')+'>↻</button><button class="burger" aria-label="Menu" onclick="toggleMenu()">☰</button></div></div>';
+ if(DEMO)h+='<div class="card no-print" style="border-left:4px solid var(--amb);padding:10px 14px"><div class="sh"><div><b>Mode Demo Presentasi (Data Dummy)</b><div class="mut">Semua perubahan hanya tersimpan sementara di browser ini dan tidak mengubah database asli.</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn g s" onclick="startDemo(\''+(A()?'viewer':'super_admin')+'\')">Ganti ke '+(A()?'Warga':'Super Admin')+'</button><button class="btn g s" onclick="resetDemoLocal()">Reset Dummy</button><button class="btn r s" onclick="logout()">Keluar Demo</button></div></div></div>';
  h+='<div class="ov'+(MENU?' open':'')+'" onclick="toggleMenu()"></div><aside class="side'+(MENU?' open':'')+'"><div class="sh"><b>Menu</b><button class="burger" aria-label="Tutup" onclick="toggleMenu()">✕</button></div>';
  h+='<div class="who"><b>'+esc(U.nama)+'</b><div class="mut">'+esc(U.email)+'</div><span class="badge'+(A()?' adm':'')+'">'+(A()?'Super Admin':'Lihat saja (Viewer)')+'</span></div>';
  tabs.forEach(function(t){h+='<button class="mi'+(TAB===t[0]?' on':'')+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</button>'});
- h+='<button class="mi lo" onclick="logout()">Keluar</button></aside><div class="pg">'+viewFn()+'</div>';
+ h+='<button class="mi lo" onclick="logout()">'+(DEMO?'Keluar Mode Demo':'Keluar')+'</button></aside><div class="pg">'+viewFn()+'</div>';
  el.innerHTML=h;
 }
 
@@ -245,6 +313,7 @@ function loginView(){
  h+='<label class="mut">Email</label><input id="le" type="email" autocomplete="email" placeholder="nama@email.com"><br><br><label class="mut">Password</label><input id="lp" type="password" autocomplete="'+(AUTH_MODE==='login'?'current-password':'new-password')+'" placeholder="Minimal 6 karakter">';
  h+=msgHtml()+'<button class="btn" type="submit" style="width:100%;margin-top:10px"'+(BUSY||!cfg.ready?' disabled':'')+'>'+(BUSY?'Memproses...':(AUTH_MODE==='login'?'Masuk':'Daftar (Akun Lihat Saja)'))+'</button></form>';
  if(AUTH_MODE==='signup'){h+='<p class="mut" style="margin-top:10px">Akun yang mendaftar otomatis hanya bisa melihat data. Hak Super Admin diberikan lewat database/Super Admin.</p>'}
+ h+='<hr style="border:0;border-top:1px solid var(--bd);margin:16px 0 12px"><div><b>Mode Demo (Presentasi Pengurus RT)</b><p class="mut" style="margin:2px 0 8px">Coba seluruh fitur dengan data dummy tanpa perlu akun & tanpa mengubah data asli:</p><div class="row"><button type="button" class="btn g s" onclick="startDemo(\'super_admin\')">Coba Demo Super Admin</button><button type="button" class="btn g s" onclick="startDemo(\'viewer\')">Coba Demo Warga (Lihat Saja)</button></div></div>';
  if(cfg.ready){
   h+='<div style="margin-top:12px;text-align:right"><button type="button" class="btn g s" onclick="CFG_OPEN=!CFG_OPEN;render()">'+(CFG_OPEN?'Tutup Pengaturan':'Ubah Koneksi Supabase')+'</button></div>';
   if(CFG_OPEN){
@@ -430,6 +499,18 @@ async function saveKas(){
  var tgl=v('kt')||today(),ket=v('kk_').trim(),jenis=v('kj')==='keluar'?'keluar':'masuk',jml=Math.round(Number(v('kn')));
  if(!ket){setMsg('Keterangan transaksi wajib diisi.');render();return}
  if(!Number.isFinite(jml)||jml<=0){setMsg('Jumlah harus lebih dari 0.');render();return}
+ if(DEMO){
+  if(EDIT&&EDIT.t==='kas'){
+   var item=D.kas.find(function(x){return x.id===EDIT.id});
+   if(item){item.tgl=tgl;item.ket=ket;item.jenis=jenis;item.jml=jml}
+   EDIT=null;setMsg('Transaksi demo diperbarui.',true);
+  }else{
+   D.kas.unshift({id:demoNid('kas'),tgl:tgl,ket:ket,jenis:jenis,jml:jml});
+   D.kas.sort(function(a,b){return String(b.tgl||'').localeCompare(String(a.tgl||''))||(b.id-a.id)});
+   setMsg('Transaksi demo disimpan.',true);
+  }
+  saveDemoData();render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
   if(EDIT&&EDIT.t==='kas'){
@@ -470,6 +551,7 @@ async function addRonda(){
  var hari=v('rh'),kk_id=Number(v('rk'));
  if(!kk_id||!D.kk.some(function(k){return k.id===kk_id})){setMsg('Pilih kepala keluarga yang valid.');render();return}
  if(D.ronda.some(function(r){return r.hari===hari&&r.kk_id===kk_id})){setMsg(nm(kk_id)+' sudah terdaftar di hari '+hari+'.');render();return}
+ if(DEMO){D.ronda.push({id:demoNid('ronda'),hari:hari,kk_id:kk_id});saveDemoData();setMsg('Jadwal ronda demo ditambahkan.',true);render();return}
  BUSY=true;clearMsg();render();
  try{
   var r=await sb.from('ronda').insert({hari:hari,kk_id:kk_id});
@@ -506,6 +588,7 @@ async function addPinjam(){
  if(!Number.isFinite(pokok)||pokok<=0){setMsg('Pokok pinjaman harus lebih dari 0.');render();return}
  if(!Number.isFinite(tenor)||tenor<1){setMsg('Tenor minimal 1 bulan.');render();return}
  if(!Number.isFinite(bunga)||bunga<0){setMsg('Jasa (%) tidak boleh negatif.');render();return}
+ if(DEMO){D.pinjam.push({id:demoNid('pinjam'),kk_id:kk_id,tgl:today(),pokok:pokok,tenor:tenor,bunga:bunga,bayar:0});saveDemoData();setMsg('Pinjaman demo disimpan.',true);render();return}
  BUSY=true;clearMsg();render();
  try{
   var r=await sb.from('pinjam').insert({kk_id:kk_id,tgl:today(),pokok:pokok,tenor:tenor,bunga:bunga,bayar:0});
@@ -521,6 +604,11 @@ async function bayar(id){
  if(!p||p.bayar>=p.tenor)return;
  var nom=ang(p);
  if(!confirm('Catat angsuran ke-'+(p.bayar+1)+' untuk '+nm(p.kk_id)+' sebesar '+rp(nom)+'?'))return;
+ if(DEMO){
+  p.bayar++;
+  D.kas.unshift({id:demoNid('kas'),tgl:today(),ket:'Angsuran '+nm(p.kk_id)+' ke-'+p.bayar,jenis:'masuk',jml:nom,ref_pinjam:p.id,ref_ke:p.bayar});
+  saveDemoData();setMsg('Angsuran demo tercatat ke kas RT.',true);render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
   var r=await sb.rpc('bayar_angsuran',{p_pinjam_id:id,p_tgl:today()});
@@ -535,6 +623,11 @@ async function batalBayar(id){
  var p=D.pinjam.find(function(x){return x.id===id});
  if(!p||p.bayar<=0)return;
  if(!confirm('Batalkan angsuran ke-'+p.bayar+' milik '+nm(p.kk_id)+'?'))return;
+ if(DEMO){
+  var ke=p.bayar,idx=D.kas.findIndex(function(x){return(x.ref_pinjam===p.id&&x.ref_ke===ke)||x.ket==='Angsuran '+nm(p.kk_id)+' ke-'+ke});
+  if(idx>=0)D.kas.splice(idx,1);
+  p.bayar--;saveDemoData();setMsg('Angsuran demo terakhir dibatalkan.',true);render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
   var r=await sb.rpc('batal_angsuran',{p_pinjam_id:id});
@@ -570,6 +663,17 @@ function wa(k,i,hp){var t='Assalamualaikum '+k.nama+',\n\n*[INFO KAMPUNG] '+i.ju
 async function saveInfo(){
  var judul=v('ij').trim(),isi=v('ii').trim();
  if(!judul||!isi){setMsg('Judul dan isi informasi wajib diisi.');render();return}
+ if(DEMO){
+  if(EDIT&&EDIT.t==='info'){
+   var item=D.info.find(function(x){return x.id===EDIT.id});
+   if(item){item.judul=judul;item.isi=isi}
+   EDIT=null;setMsg('Informasi demo diperbarui.',true);
+  }else{
+   D.info.unshift({id:demoNid('info'),judul:judul,isi:isi,tgl:today()});
+   setMsg('Informasi demo disimpan.',true);
+  }
+  saveDemoData();render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
   if(EDIT&&EDIT.t==='info'){
@@ -602,7 +706,7 @@ function vDb(){
  });
  h+='</table></div>';
 
- h+='<div class="card"><b>Save / Backup & Restore Database</b><p class="mut">KK: '+D.kk.length+' · Transaksi kas: '+D.kas.length+' · Jadwal ronda: '+D.ronda.length+' · Pinjaman: '+D.pinjam.length+' · Informasi: '+D.info.length+'</p><div class="row"><button class="btn" onclick="saveBackupFile()">Save / Download Backup (.json)</button><button class="btn g" onclick="exp()">Salin JSON</button><button class="btn g" onclick="triggerRestore()">Restore dari File (.json)</button>'+(!D.kk.length&&!D.kas.length&&!D.info.length?'<button class="btn" onclick="seedDemo()"'+(BUSY?' disabled':'')+'>Isi Data Contoh (Demo)</button>':'')+'</div><input id="impFile" type="file" accept=".json,application/json" style="display:none" onchange="handleRestoreFile(this)"><textarea id="ex" rows="5" style="display:none;margin-top:8px"></textarea><div id="dbMsg" class="mut" style="margin-top:6px"></div></div>';
+ h+='<div class="card"><b>Save / Backup & Restore Database</b><p class="mut">KK: '+D.kk.length+' · Transaksi kas: '+D.kas.length+' · Jadwal ronda: '+D.ronda.length+' · Pinjaman: '+D.pinjam.length+' · Informasi: '+D.info.length+'</p><div class="row"><button class="btn" onclick="saveBackupFile()">Save / Download Backup (.json)</button><button class="btn g" onclick="exp()">Salin JSON</button><button class="btn g" onclick="triggerRestore()">Restore dari File (.json)</button>'+(DEMO?'<button class="btn r" onclick="resetDemoLocal()">Reset Data Dummy</button>':(!D.kk.length&&!D.kas.length&&!D.info.length?'<button class="btn" onclick="seedDemo()"'+(BUSY?' disabled':'')+'>Isi Data Contoh (Demo)</button>':''))+'</div><input id="impFile" type="file" accept=".json,application/json" style="display:none" onchange="handleRestoreFile(this)"><textarea id="ex" rows="5" style="display:none;margin-top:8px"></textarea><div id="dbMsg" class="mut" style="margin-top:6px"></div></div>';
  return h;
 }
 
@@ -625,7 +729,16 @@ async function restoreFromJsonText(raw){
  try{
   var p=JSON.parse(raw);
   if(!p||!Array.isArray(p.kk)||!Array.isArray(p.kas)||!Array.isArray(p.ronda)||!Array.isArray(p.pinjam)||!Array.isArray(p.info))throw new Error('Format file backup tidak sesuai');
-  if(!confirm('Tambahkan data dari backup ('+p.kk.length+' KK, '+p.kas.length+' kas, '+p.ronda.length+' ronda, '+p.pinjam.length+' pinjam, '+p.info.length+' info) ke Supabase?'))return;
+  if(!confirm('Tambahkan data dari backup ('+p.kk.length+' KK, '+p.kas.length+' kas, '+p.ronda.length+' ronda, '+p.pinjam.length+' pinjam, '+p.info.length+' info)?'))return;
+  if(DEMO){
+   var dm={};
+   p.kk.forEach(function(k){var id=demoNid('kk');dm[k.id]=id;D.kk.push({id:id,nama:String(k.nama||'Warga').trim()||'Warga',blok:String(k.blok||''),hp:normHp(k.hp)})});
+   p.kas.forEach(function(x){D.kas.push({id:demoNid('kas'),tgl:x.tgl||today(),ket:String(x.ket||'Transaksi'),jenis:x.jenis==='keluar'?'keluar':'masuk',jml:Math.max(1,Math.round(Number(x.jml)||1))})});
+   p.ronda.forEach(function(r){var kid=dm[r.kk_id!=null?r.kk_id:r.kk];if(kid&&HARI.indexOf(r.hari)>=0)D.ronda.push({id:demoNid('ronda'),hari:r.hari,kk_id:kid})});
+   p.pinjam.forEach(function(x){var kid=dm[x.kk_id!=null?x.kk_id:x.kk],ten=Math.max(1,Math.floor(Number(x.tenor)||1)),byr=Math.min(ten,Math.max(0,Math.floor(Number(x.bayar)||0)));if(kid)D.pinjam.push({id:demoNid('pinjam'),kk_id:kid,tgl:x.tgl||today(),pokok:Math.max(1,Math.round(Number(x.pokok)||1)),tenor:ten,bunga:Math.max(0,Number(x.bunga)||0),bayar:byr})});
+   p.info.forEach(function(i){D.info.push({id:demoNid('info'),judul:String(i.judul||'Info'),isi:String(i.isi||'-'),tgl:i.tgl||today()})});
+   saveDemoData();setMsg('Backup berhasil dipulihkan ke mode demo.',true);render();return;
+  }
   BUSY=true;clearMsg();render();
   var kkMap={};
   if(p.kk.length){
@@ -661,6 +774,17 @@ async function restoreFromJsonText(raw){
 async function saveKK(){
  var nama=v('dn').trim(),blok=v('db').trim(),hp=normHp(v('dh'));
  if(!nama){setMsg('Nama KK wajib diisi.');render();return}
+ if(DEMO){
+  if(EDIT&&EDIT.t==='kk'){
+   var item=D.kk.find(function(x){return x.id===EDIT.id});
+   if(item){item.nama=nama;item.blok=blok;item.hp=hp}
+   EDIT=null;setMsg('Data KK demo diperbarui.',true);
+  }else{
+   D.kk.push({id:demoNid('kk'),nama:nama,blok:blok,hp:hp});
+   setMsg('Data KK demo disimpan.',true);
+  }
+  saveDemoData();render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
   if(EDIT&&EDIT.t==='kk'){
@@ -682,6 +806,12 @@ async function saveProfile(pid){
  var role=roleEl?roleEl.value:'viewer';
  var kk_id=(kkEl&&kkEl.value)?Number(kkEl.value):null;
  if(pid===U.id)role='super_admin';
+ if(DEMO){
+  var pr=D.profiles.find(function(x){return x.id===pid});
+  if(pr){pr.role=role;pr.kk_id=kk_id}
+  if(pid===U.id)U.kk_id=kk_id;
+  saveDemoData();setMsg('Pengaturan akun demo diperbarui.',true);render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
   var r=await sb.from('profiles').update({role:role,kk_id:kk_id}).eq('id',pid);
@@ -762,6 +892,12 @@ async function del(t,id){
   if(cr||cp)warn='Hapus KK ini? '+cr+' jadwal ronda dan '+cp+' data pinjaman milik KK ini juga akan ikut terhapus.';
  }
  if(!confirm(warn))return;
+ if(DEMO){
+  D[t]=D[t].filter(function(x){return x.id!==id});
+  if(t==='kk'){D.ronda=D.ronda.filter(function(r){return r.kk_id!==id});D.pinjam=D.pinjam.filter(function(p){return p.kk_id!==id})}
+  if(EDIT&&EDIT.t===t&&EDIT.id===id)EDIT=null;
+  saveDemoData();setMsg('Data demo dihapus.',true);render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
   var r=await sb.from(t).delete().eq('id',id);
