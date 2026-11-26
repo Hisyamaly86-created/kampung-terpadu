@@ -22,7 +22,7 @@ h1{font-size:20px;margin:0}h2{font-size:17px;margin:18px 0 8px}
 .tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}th{color:var(--mut);font-weight:600;font-size:13px}
 input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
-.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.row>*{flex:1;min-width:120px}
 .btn{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit;font-weight:600}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.s{padding:4px 10px;font-size:13px}.btn.g{background:transparent;color:var(--pri);border:1px solid var(--pri)}.btn.r{background:transparent;color:var(--red);border:1px solid var(--red)}
@@ -45,8 +45,25 @@ input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--bd);b
 pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:4px 0}
 .tabs-mini{display:flex;gap:6px;margin-bottom:12px}
 .tabs-mini button{flex:1}
+.print-only{display:none}
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px;text-align:center}
+.sig-space{height:58px}
+@media print{
+ :root{color-scheme:light;--bg:#fff;--card:#fff;--tx:#000;--mut:#444;--bd:#ccc;--pri:#1d5e37;--red:#991b1b}
+ body{background:#fff;color:#000;font-size:12px}
+ .wrap{max-width:none;padding:0}
+ .top,.side,.ov,.no-print,.btn,th.act,td.act{display:none!important}
+ .print-only{display:block!important}
+ .card{border:1px solid #ccc;border-radius:6px;padding:10px;margin-bottom:10px;break-inside:avoid}
+ .tw{overflow:visible}
+ table{font-size:11.5px}
+ th,td{padding:5px 6px;white-space:normal}
+}
 </style>
+<style id="printPageStyle">@page{size:210mm 297mm;margin:12mm}</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div class="wrap" id="app"><div class="card" style="max-width:410px;margin:8vh auto 0">Memuat Kampung Terpadu...</div></div>
@@ -59,6 +76,14 @@ var CFG_KEY='kampung_terpadu_sb_cfg',TAB_KEY='kampung_terpadu_tab';
 var sb=null,U=null,TAB='beranda',MENU=false,SHARE=null,EDIT=null,MSG='',MSG_OK=false,AUTH_MODE='login',BUSY=false,CFG_OPEN=false;
 var D={kk:[],kas:[],ronda:[],pinjam:[],info:[],profiles:[]};
 var HARI=['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+var KF={from:'',to:''};
+var PR={size:'A4',ori:'portrait'};
+var PAPERS={
+ A4:{label:'A4 (210 × 297 mm)',w:210,h:297},
+ F4:{label:'F4 / Folio (215 × 330 mm)',w:215,h:330},
+ Letter:{label:'Letter (216 × 279 mm)',w:215.9,h:279.4},
+ A5:{label:'A5 (148 × 210 mm)',w:148,h:210}
+};
 
 function getCfg(){
  var u=SUPABASE_URL,k=SUPABASE_ANON_KEY;
@@ -80,6 +105,7 @@ function saveCfg(){
  CFG_OPEN=false;clearMsg();initSb();boot();
 }
 function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function monthStart(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'}
 function rp(n){var x=Number(n);if(!Number.isFinite(x))x=0;return'Rp '+x.toLocaleString('id-ID')}
 function nm(id){var k=D.kk.find(function(x){return x.id==id});return k?k.nama+(k.blok?' ('+k.blok+')':''):'-'}
 function normHp(raw){var d=String(raw||'').replace(/\D/g,'');if(!d)return'';if(d.indexOf('0')===0)d='62'+d.slice(1);return d}
@@ -174,7 +200,7 @@ async function doAuth(){
     await loadUserAndData(res2.data.user);
    }else{
     AUTH_MODE='login';
-    setMsg('Pendaftaran berhasil! Cek email Anda untuk verifikasi (jika aktif), lalu masuk.',true);
+    setMsg('Pendaftaran berhasil! Silakan masuk dengan akun Anda.',true);
     BUSY=false;render();
    }
   }
@@ -199,7 +225,7 @@ function render(){
  var tabs=[['beranda','Beranda'],['kas','Kas RT'],['ronda','Jadwal Ronda'],['pinjam','Simpan Pinjam'],['info','Informasi']];
  if(A())tabs.push(['db','Database']);
  var viewFn={beranda:vBeranda,kas:vKas,ronda:vRonda,pinjam:vPinjam,info:vInfo,db:vDb}[TAB]||vBeranda;
- var h='<div class="top"><div><h1>🏘️ Kampung Terpadu</h1><span class="mut">RT 03 / RW 05 · Online</span></div><div style="display:flex;gap:6px"><button class="burger" title="Segarkan" aria-label="Segarkan" onclick="refreshData()"'+(BUSY?' disabled':'')+'>↻</button><button class="burger" aria-label="Menu" onclick="toggleMenu()">☰</button></div></div>';
+ var h='<div class="top"><div><h1>🏘️ Kampung Terpadu</h1><span class="mut">RT 03 / RW 05 · Tersinkron Supabase</span></div><div style="display:flex;gap:6px"><button class="burger" title="Segarkan" aria-label="Segarkan" onclick="refreshData()"'+(BUSY?' disabled':'')+'>↻</button><button class="burger" aria-label="Menu" onclick="toggleMenu()">☰</button></div></div>';
  h+='<div class="ov'+(MENU?' open':'')+'" onclick="toggleMenu()"></div><aside class="side'+(MENU?' open':'')+'"><div class="sh"><b>Menu</b><button class="burger" aria-label="Tutup" onclick="toggleMenu()">✕</button></div>';
  h+='<div class="who"><b>'+esc(U.nama)+'</b><div class="mut">'+esc(U.email)+'</div><span class="badge'+(A()?' adm':'')+'">'+(A()?'Super Admin':'Lihat saja (Viewer)')+'</span></div>';
  tabs.forEach(function(t){h+='<button class="mi'+(TAB===t[0]?' on':'')+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</button>'});
@@ -228,7 +254,20 @@ function loginView(){
  return h+'</div>';
 }
 
-function saldo(){var m=0,k=0;D.kas.forEach(function(x){var n=Number(x.jml)||0;x.jenis==='masuk'?m+=n:k+=n});return{m:m,k:k,s:m-k}}
+function saldo(list){var m=0,k=0;(list||D.kas).forEach(function(x){var n=Number(x.jml)||0;x.jenis==='masuk'?m+=n:k+=n});return{m:m,k:k,s:m-k}}
+function kasFiltered(){
+ return D.kas.filter(function(x){
+  if(KF.from&&String(x.tgl||'')<KF.from)return false;
+  if(KF.to&&String(x.tgl||'')>KF.to)return false;
+  return true;
+ });
+}
+function periodeLabel(){
+ if(KF.from&&KF.to)return KF.from+' s/d '+KF.to;
+ if(KF.from)return'Mulai '+KF.from;
+ if(KF.to)return'Sampai '+KF.to;
+ return'Semua Periode';
+}
 function ang(p){var t=Number(p.tenor),pk=Number(p.pokok),bg=Number(p.bunga)||0;if(!Number.isFinite(t)||t<=0||!Number.isFinite(pk)||pk<=0)return 0;return Math.round(pk*(1+bg/100)/t)}
 
 function vBeranda(){
@@ -250,17 +289,141 @@ function vBeranda(){
 }
 
 function vKas(){
- var s=saldo(),ed=(EDIT&&EDIT.t==='kas')?D.kas.find(function(x){return x.id===EDIT.id}):null;
- var h='<div class="grid"><div class="card stat"><b class="in">'+rp(s.m)+'</b><span>Pemasukan</span></div><div class="card stat"><b class="out">'+rp(s.k)+'</b><span>Pengeluaran</span></div><div class="card stat"><b>'+rp(s.s)+'</b><span>Saldo</span></div></div>';
+ var rows=kasFiltered(),s=saldo(rows),ed=(EDIT&&EDIT.t==='kas')?D.kas.find(function(x){return x.id===EDIT.id}):null;
+ var h='<div class="print-only" style="margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:8px"><h1 style="font-size:18px;margin:0">LAPORAN KEUANGAN KAS RT 03 / RW 05</h1><div style="font-size:12px;margin-top:4px">Periode: <b>'+esc(periodeLabel())+'</b> · Dicetak: '+esc(today())+'</div></div>';
+ h+='<div class="grid"><div class="card stat"><b class="in">'+rp(s.m)+'</b><span>Pemasukan</span></div><div class="card stat"><b class="out">'+rp(s.k)+'</b><span>Pengeluaran</span></div><div class="card stat"><b class="'+(s.s>=0?'in':'out')+'">'+rp(s.s)+'</b><span>Saldo</span></div></div>';
  if(A()){
-  h+='<div class="card"><b>'+(ed?'Edit transaksi':'Tambah transaksi')+'</b><div class="row" style="margin-top:8px"><input id="kt" type="date" value="'+esc(ed?ed.tgl:today())+'"><input id="kk_" placeholder="Keterangan" value="'+esc(ed?ed.ket:'')+'"><select id="kj"><option value="masuk"'+(ed&&ed.jenis==='masuk'?' selected':'')+'>Pemasukan</option><option value="keluar"'+(ed&&ed.jenis==='keluar'?' selected':'')+'>Pengeluaran</option></select><input id="kn" type="number" min="1" placeholder="Jumlah (Rp)" value="'+esc(ed?ed.jml:'')+'"><button class="btn" onclick="saveKas()"'+(BUSY?' disabled':'')+'>'+(ed?'Update':'Simpan')+'</button>'+(ed?'<button class="btn g" onclick="cancelEdit()">Batal</button>':'')+'</div>'+msgHtml()+'</div>';
- }else if(MSG){h+='<div class="card">'+msgHtml()+'</div>'}
- h+='<div class="card tw"><table><tr><th>Tanggal</th><th>Keterangan</th><th>Jumlah</th>'+(A()?'<th>Aksi</th>':'')+'</tr>';
- if(!D.kas.length)h+='<tr><td colspan="'+(A()?4:3)+'" class="mut">Belum ada transaksi kas.</td></tr>';
- D.kas.forEach(function(x){
-  h+='<tr><td>'+esc(x.tgl)+'</td><td>'+esc(x.ket)+'</td><td class="'+(x.jenis==='masuk'?'in':'out')+'">'+(x.jenis==='masuk'?'+':'−')+rp(x.jml)+'</td>'+(A()?'<td><button class="btn g s" onclick="startEdit(\'kas\','+x.id+')">Edit</button> <button class="btn r s" onclick="del(\'kas\','+x.id+')">Hapus</button></td>':'')+'</tr>';
+  h+='<div class="card no-print"><b>'+(ed?'Edit transaksi':'Tambah transaksi')+'</b><div class="row" style="margin-top:8px"><input id="kt" type="date" value="'+esc(ed?ed.tgl:today())+'"><input id="kk_" placeholder="Keterangan" value="'+esc(ed?ed.ket:'')+'"><select id="kj"><option value="masuk"'+(ed&&ed.jenis==='masuk'?' selected':'')+'>Pemasukan</option><option value="keluar"'+(ed&&ed.jenis==='keluar'?' selected':'')+'>Pengeluaran</option></select><input id="kn" type="number" min="1" placeholder="Jumlah (Rp)" value="'+esc(ed?ed.jml:'')+'"><button class="btn" onclick="saveKas()"'+(BUSY?' disabled':'')+'>'+(ed?'Update':'Simpan ke Cloud')+'</button>'+(ed?'<button class="btn g" onclick="cancelEdit()">Batal</button>':'')+'</div>'+msgHtml()+'</div>';
+ }else if(MSG){h+='<div class="card no-print">'+msgHtml()+'</div>'}
+ h+='<div class="card no-print"><b>Laporan, Print & Download PDF</b><div class="row" style="margin-top:8px"><div><label class="mut">Dari Tanggal</label><input id="kf1" type="date" value="'+esc(KF.from)+'" onchange="setKasFilter()"></div><div><label class="mut">Sampai Tanggal</label><input id="kf2" type="date" value="'+esc(KF.to)+'" onchange="setKasFilter()"></div><div><label class="mut">Ukuran Kertas</label><select id="kpSize" onchange="setPrintCfg()">'+Object.keys(PAPERS).map(function(k){return'<option value="'+k+'"'+(PR.size===k?' selected':'')+'>'+esc(PAPERS[k].label)+'</option>'}).join('')+'</select></div><div><label class="mut">Orientasi</label><select id="kpOri" onchange="setPrintCfg()"><option value="portrait"'+(PR.ori==='portrait'?' selected':'')+'>Portrait (Tegak)</option><option value="landscape"'+(PR.ori==='landscape'?' selected':'')+'>Landscape (Mendatar)</option></select></div></div>';
+ h+='<div class="row" style="margin-top:10px"><button class="btn g s" onclick="setKasMonth()">Bulan Ini</button><button class="btn g s" onclick="clearKasFilter()">Semua Tanggal</button><button class="btn s" onclick="printKas()">Print / Cetak</button><button class="btn s" onclick="downloadPdfKas()">Download PDF</button><button class="btn g s" onclick="sharePdfKas()">Bagikan PDF</button><button class="btn g s" onclick="downloadCsvKas()">Save CSV</button></div><div id="pdfMsg" class="mut" style="margin-top:6px"></div></div>';
+ h+='<div class="card tw"><table><tr><th>Tanggal</th><th>Keterangan</th><th>Jumlah</th>'+(A()?'<th class="act">Aksi</th>':'')+'</tr>';
+ if(!rows.length)h+='<tr><td colspan="'+(A()?4:3)+'" class="mut">Belum ada transaksi kas pada periode ini.</td></tr>';
+ rows.forEach(function(x){
+  h+='<tr><td>'+esc(x.tgl)+'</td><td>'+esc(x.ket)+'</td><td class="'+(x.jenis==='masuk'?'in':'out')+'">'+(x.jenis==='masuk'?'+':'−')+rp(x.jml)+'</td>'+(A()?'<td class="act"><button class="btn g s" onclick="startEdit(\'kas\','+x.id+')">Edit</button> <button class="btn r s" onclick="del(\'kas\','+x.id+')">Hapus</button></td>':'')+'</tr>';
  });
- return h+'</table></div>';
+ h+='</table></div>';
+ h+='<div class="print-only sig-grid"><div>Mengetahui,<br><b>Ketua RT 03</b><div class="sig-space"></div>( ________________________ )</div><div>Dicetak: '+esc(today())+'<br><b>Bendahara RT 03</b><div class="sig-space"></div>( ________________________ )</div></div>';
+ return h;
+}
+
+function setKasFilter(){KF.from=v('kf1');KF.to=v('kf2');render()}
+function setKasMonth(){KF.from=monthStart();KF.to=today();render()}
+function clearKasFilter(){KF.from='';KF.to='';render()}
+function setPrintCfg(){
+ PR.size=PAPERS[v('kpSize')]?v('kpSize'):'A4';
+ PR.ori=v('kpOri')==='landscape'?'landscape':'portrait';
+ applyPrintPageCss();
+}
+function applyPrintPageCss(){
+ var p=PAPERS[PR.size]||PAPERS.A4;
+ var w=PR.ori==='landscape'?p.h:p.w,h=PR.ori==='landscape'?p.w:p.h;
+ var st=document.getElementById('printPageStyle');
+ if(st)st.textContent='@page{size:'+w+'mm '+h+'mm;margin:12mm}';
+}
+function printKas(){setPrintCfg();window.print()}
+
+function buildKasPdfDoc(){
+ if(!window.jspdf||!window.jspdf.jsPDF)throw new Error('Library PDF belum termuat. Pastikan koneksi internet aktif.');
+ var p=PAPERS[PR.size]||PAPERS.A4;
+ var doc=new window.jspdf.jsPDF({orientation:PR.ori,unit:'mm',format:[p.w,p.h]});
+ if(typeof doc.autoTable!=='function')throw new Error('Plugin tabel PDF belum siap.');
+ var rows=kasFiltered(),s=saldo(rows);
+ var pw=doc.internal.pageSize.getWidth();
+ doc.setFont('helvetica','bold');doc.setFontSize(14);
+ doc.text('LAPORAN KEUANGAN KAS RT 03 / RW 05',14,16);
+ doc.setFont('helvetica','normal');doc.setFontSize(10);
+ doc.text('Periode: '+periodeLabel()+'   |   Dicetak: '+today()+'   |   Kertas: '+PR.size+' ('+(PR.ori==='landscape'?'Landscape':'Portrait')+')',14,22);
+ doc.setDrawColor(47,125,79);doc.setLineWidth(0.5);doc.line(14,25,pw-14,25);
+
+ doc.setFont('helvetica','bold');doc.setFontSize(10);
+ doc.text('Pemasukan: '+rp(s.m),14,32);
+ doc.text('Pengeluaran: '+rp(s.k),Math.max(80,pw*0.36),32);
+ doc.text('Saldo Akhir: '+rp(s.s),Math.max(145,pw*0.68),32);
+
+ var body=rows.map(function(x,idx){
+  return[idx+1,String(x.tgl||''),String(x.ket||''),x.jenis==='masuk'?'Pemasukan':'Pengeluaran',(x.jenis==='masuk'?'+ ':'- ')+rp(x.jml)];
+ });
+ if(!body.length)body=[['-','-','Belum ada transaksi pada periode ini','-','-']];
+
+ doc.autoTable({
+  startY:37,
+  head:[['No','Tanggal','Keterangan','Jenis','Jumlah']],
+  body:body,
+  styles:{fontSize:9,cellPadding:2.5},
+  headStyles:{fillColor:[47,125,79],textColor:255,fontStyle:'bold'},
+  columnStyles:{0:{halign:'center',cellWidth:10},1:{cellWidth:24},3:{cellWidth:24},4:{halign:'right',cellWidth:34}},
+  margin:{left:14,right:14},
+  didDrawPage:function(){
+   var str='Halaman '+doc.internal.getNumberOfPages();
+   doc.setFontSize(8);doc.setTextColor(120);
+   doc.text(str,pw-14,doc.internal.pageSize.getHeight()-8,{align:'right'});
+   doc.setTextColor(0);
+  }
+ });
+
+ var y=(doc.lastAutoTable?doc.lastAutoTable.finalY:50)+12;
+ var ph=doc.internal.pageSize.getHeight();
+ if(y+32>ph){doc.addPage();y=20}
+ doc.setFont('helvetica','normal');doc.setFontSize(10);
+ doc.text('Mengetahui,',24,y);doc.text('Bendahara RT 03,',pw-62,y);
+ doc.setFont('helvetica','bold');
+ doc.text('Ketua RT 03',24,y+5);
+ doc.setFont('helvetica','normal');
+ doc.text('( ______________________ )',16,y+24);
+ doc.text('( ______________________ )',pw-70,y+24);
+ return doc;
+}
+
+function downloadPdfKas(){
+ var m=document.getElementById('pdfMsg');
+ try{
+  var doc=buildKasPdfDoc();
+  var fn='Laporan-Kas-RT-'+today()+'.pdf';
+  doc.save(fn);
+  if(m)m.textContent='PDF berhasil diunduh: '+fn;
+ }catch(e){
+  if(m)m.textContent='Gagal membuat PDF: '+(e.message||e);
+ }
+}
+
+async function sharePdfKas(){
+ var m=document.getElementById('pdfMsg');
+ try{
+  var doc=buildKasPdfDoc();
+  var fn='Laporan-Kas-RT-'+today()+'.pdf';
+  var blob=doc.output('blob');
+  var file=new File([blob],fn,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.share&&navigator.canShare({files:[file]})){
+   await navigator.share({title:'Laporan Kas RT 03 / RW 05',text:'Laporan Keuangan Kas RT ('+periodeLabel()+')',files:[file]});
+   if(m)m.textContent='PDF berhasil dibagikan.';
+  }else{
+   doc.save(fn);
+   if(m)m.textContent='Browser ini belum mendukung bagikan file langsung — PDF telah diunduh ('+fn+'), silakan kirim manual ke WhatsApp.';
+  }
+ }catch(e){
+  if(e&&e.name==='AbortError')return;
+  if(m)m.textContent='Gagal membagikan PDF: '+(e.message||e);
+ }
+}
+
+function downloadFile(name,content,mime){
+ var blob=new Blob([content],{type:mime});
+ var url=URL.createObjectURL(blob);
+ var a=document.createElement('a');
+ a.href=url;a.download=name;
+ document.body.appendChild(a);a.click();document.body.removeChild(a);
+ setTimeout(function(){URL.revokeObjectURL(url)},1000);
+}
+
+function downloadCsvKas(){
+ var rows=kasFiltered();
+ var csv='\uFEFFTanggal,Keterangan,Jenis,Jumlah\n'+rows.map(function(x){
+  return[x.tgl,'"'+String(x.ket||'').replace(/"/g,'""')+'"',x.jenis,x.jml].join(',');
+ }).join('\n');
+ downloadFile('Laporan-Kas-RT-'+today()+'.csv',csv,'text/csv;charset=utf-8;');
+ var m=document.getElementById('pdfMsg');
+ if(m)m.textContent='File CSV berhasil disimpan.';
 }
 
 async function saveKas(){
@@ -272,11 +435,11 @@ async function saveKas(){
   if(EDIT&&EDIT.t==='kas'){
    var r1=await sb.from('kas').update({tgl:tgl,ket:ket,jenis:jenis,jml:jml}).eq('id',EDIT.id);
    if(r1.error)throw r1.error;
-   EDIT=null;setMsg('Transaksi berhasil diperbarui.',true);
+   EDIT=null;setMsg('Transaksi berhasil diperbarui & tersimpan ke Supabase.',true);
   }else{
    var r2=await sb.from('kas').insert({tgl:tgl,ket:ket,jenis:jenis,jml:jml});
    if(r2.error)throw r2.error;
-   setMsg('Transaksi berhasil disimpan.',true);
+   setMsg('Transaksi berhasil disimpan ke Supabase.',true);
   }
   await loadAll();
  }catch(e){setMsg('Gagal menyimpan kas: '+(e.message||e))}
@@ -289,11 +452,11 @@ function vRonda(){
  var h='';
  if(A()){
   if(!D.kk.length){
-   h+='<div class="card"><b>Tambah jadwal ronda</b><p class="mut" style="margin:6px 0 0">Belum ada data KK. Tambahkan KK terlebih dahulu di menu Database.</p></div>';
+   h+='<div class="card no-print"><b>Tambah jadwal ronda</b><p class="mut" style="margin:6px 0 0">Belum ada data KK. Tambahkan KK terlebih dahulu di menu Database.</p></div>';
   }else{
-   h+='<div class="card"><b>Tambah jadwal ronda</b><div class="row" style="margin-top:8px"><select id="rh">'+HARI.map(function(x){return'<option>'+x+'</option>'}).join('')+'</select><select id="rk">'+kkOpt()+'</select><button class="btn" onclick="addRonda()"'+(BUSY?' disabled':'')+'>Tambah</button></div>'+msgHtml()+'</div>';
+   h+='<div class="card no-print"><b>Tambah jadwal ronda</b><div class="row" style="margin-top:8px"><select id="rh">'+HARI.map(function(x){return'<option>'+x+'</option>'}).join('')+'</select><select id="rk">'+kkOpt()+'</select><button class="btn" onclick="addRonda()"'+(BUSY?' disabled':'')+'>Tambah & Simpan</button></div>'+msgHtml()+'</div>';
   }
- }else if(MSG){h+='<div class="card">'+msgHtml()+'</div>'}
+ }else if(MSG){h+='<div class="card no-print">'+msgHtml()+'</div>'}
  HARI.forEach(function(hr){
   var l=D.ronda.filter(function(r){return r.hari===hr});
   h+='<div class="card"><b>'+hr+'</b>'+(l.length?l.map(function(r){
@@ -311,7 +474,7 @@ async function addRonda(){
  try{
   var r=await sb.from('ronda').insert({hari:hari,kk_id:kk_id});
   if(r.error)throw r.error;
-  setMsg('Jadwal ronda ditambahkan.',true);
+  setMsg('Jadwal ronda tersimpan ke Supabase.',true);
   await loadAll();
  }catch(e){setMsg('Gagal menambah ronda: '+(e.message||e))}
  finally{BUSY=false;render()}
@@ -321,18 +484,18 @@ function vPinjam(){
  var h='';
  if(A()){
   if(!D.kk.length){
-   h+='<div class="card"><b>Pinjaman baru</b><p class="mut" style="margin:6px 0 0">Belum ada data KK. Tambahkan KK terlebih dahulu di menu Database.</p></div>';
+   h+='<div class="card no-print"><b>Pinjaman baru</b><p class="mut" style="margin:6px 0 0">Belum ada data KK. Tambahkan KK terlebih dahulu di menu Database.</p></div>';
   }else{
-   h+='<div class="card"><b>Pinjaman baru</b><div class="row" style="margin-top:8px"><select id="pk">'+kkOpt()+'</select><input id="pp" type="number" min="1" placeholder="Pokok (Rp)"><input id="pt" type="number" min="1" step="1" placeholder="Tenor (bulan)"><input id="pb" type="number" min="0" step="any" placeholder="Jasa total % (0 = tanpa)" value="0"><button class="btn" onclick="addPinjam()"'+(BUSY?' disabled':'')+'>Simpan</button></div>'+msgHtml()+'</div>';
+   h+='<div class="card no-print"><b>Pinjaman baru</b><div class="row" style="margin-top:8px"><select id="pk">'+kkOpt()+'</select><input id="pp" type="number" min="1" placeholder="Pokok (Rp)"><input id="pt" type="number" min="1" step="1" placeholder="Tenor (bulan)"><input id="pb" type="number" min="0" step="any" placeholder="Jasa total % (0 = tanpa)" value="0"><button class="btn" onclick="addPinjam()"'+(BUSY?' disabled':'')+'>Simpan ke Cloud</button></div>'+msgHtml()+'</div>';
   }
- }else if(MSG){h+='<div class="card">'+msgHtml()+'</div>'}
- h+='<div class="card tw"><table><tr><th>Peminjam</th><th>Tanggal</th><th>Pokok</th><th>Angsuran/bln</th><th>Terbayar</th><th>Sisa</th><th>Progres</th>'+(A()?'<th>Aksi</th>':'')+'</tr>';
+ }else if(MSG){h+='<div class="card no-print">'+msgHtml()+'</div>'}
+ h+='<div class="card tw"><table><tr><th>Peminjam</th><th>Tanggal</th><th>Pokok</th><th>Angsuran/bln</th><th>Terbayar</th><th>Sisa</th><th>Progres</th>'+(A()?'<th class="act">Aksi</th>':'')+'</tr>';
  if(!D.pinjam.length)h+='<tr><td colspan="'+(A()?8:7)+'" class="mut">Belum ada data pinjaman.</td></tr>';
  D.pinjam.forEach(function(p){
   var tenor=Math.max(1,Number(p.tenor)||1),bayarVal=Math.max(0,Number(p.bayar)||0);
   var pc=Math.min(100,Math.max(0,Math.round(bayarVal/tenor*100)));
   var sisa=ang(p)*Math.max(0,tenor-bayarVal);
-  h+='<tr><td>'+esc(nm(p.kk_id))+'</td><td>'+esc(p.tgl)+'</td><td>'+rp(p.pokok)+'</td><td>'+rp(ang(p))+'</td><td>'+bayarVal+' / '+tenor+'</td><td>'+rp(sisa)+'</td><td><div class="bar"><i style="width:'+pc+'%"></i></div>'+(bayarVal>=tenor?'<span class="badge">Lunas</span>':'')+'</td>'+(A()?'<td>'+(bayarVal<tenor?'<button class="btn s" onclick="bayar('+p.id+')"'+(BUSY?' disabled':'')+'>+ Angsuran</button> ':'')+(bayarVal>0?'<button class="btn g s" onclick="batalBayar('+p.id+')"'+(BUSY?' disabled':'')+'>−1</button> ':'')+'<button class="btn r s" onclick="del(\'pinjam\','+p.id+')">Hapus</button></td>':'')+'</tr>';
+  h+='<tr><td>'+esc(nm(p.kk_id))+'</td><td>'+esc(p.tgl)+'</td><td>'+rp(p.pokok)+'</td><td>'+rp(ang(p))+'</td><td>'+bayarVal+' / '+tenor+'</td><td>'+rp(sisa)+'</td><td><div class="bar"><i style="width:'+pc+'%"></i></div>'+(bayarVal>=tenor?'<span class="badge">Lunas</span>':'')+'</td>'+(A()?'<td class="act">'+(bayarVal<tenor?'<button class="btn s" onclick="bayar('+p.id+')"'+(BUSY?' disabled':'')+'>+ Angsuran</button> ':'')+(bayarVal>0?'<button class="btn g s" onclick="batalBayar('+p.id+')"'+(BUSY?' disabled':'')+'>−1</button> ':'')+'<button class="btn r s" onclick="del(\'pinjam\','+p.id+')">Hapus</button></td>':'')+'</tr>';
  });
  return h+'</table></div>';
 }
@@ -347,7 +510,7 @@ async function addPinjam(){
  try{
   var r=await sb.from('pinjam').insert({kk_id:kk_id,tgl:today(),pokok:pokok,tenor:tenor,bunga:bunga,bayar:0});
   if(r.error)throw r.error;
-  setMsg('Pinjaman baru disimpan.',true);
+  setMsg('Pinjaman baru tersimpan ke Supabase.',true);
   await loadAll();
  }catch(e){setMsg('Gagal menyimpan pinjaman: '+(e.message||e))}
  finally{BUSY=false;render()}
@@ -362,7 +525,7 @@ async function bayar(id){
  try{
   var r=await sb.rpc('bayar_angsuran',{p_pinjam_id:id,p_tgl:today()});
   if(r.error)throw r.error;
-  setMsg('Angsuran tercatat ke pinjaman dan kas RT.',true);
+  setMsg('Angsuran tercatat & tersimpan ke kas RT.',true);
   await loadAll();
  }catch(e){setMsg('Gagal mencatat angsuran: '+(e.message||e))}
  finally{BUSY=false;render()}
@@ -385,13 +548,13 @@ async function batalBayar(id){
 function vInfo(){
  var ed=(EDIT&&EDIT.t==='info')?D.info.find(function(x){return x.id===EDIT.id}):null,h='';
  if(A()){
-  h+='<div class="card"><b>'+(ed?'Edit informasi kampung':'Buat informasi kampung')+'</b><div style="margin-top:8px"><input id="ij" placeholder="Judul" value="'+esc(ed?ed.judul:'')+'"><br><br><textarea id="ii" rows="3" placeholder="Isi informasi...">'+esc(ed?ed.isi:'')+'</textarea>'+msgHtml()+'<div class="row" style="margin-top:10px"><button class="btn" onclick="saveInfo()"'+(BUSY?' disabled':'')+'>'+(ed?'Update':'Simpan')+'</button>'+(ed?'<button class="btn g" onclick="cancelEdit()">Batal</button>':'')+'</div></div></div>';
- }else if(MSG){h+='<div class="card">'+msgHtml()+'</div>'}
+  h+='<div class="card no-print"><b>'+(ed?'Edit informasi kampung':'Buat informasi kampung')+'</b><div style="margin-top:8px"><input id="ij" placeholder="Judul" value="'+esc(ed?ed.judul:'')+'"><br><br><textarea id="ii" rows="3" placeholder="Isi informasi...">'+esc(ed?ed.isi:'')+'</textarea>'+msgHtml()+'<div class="row" style="margin-top:10px"><button class="btn" onclick="saveInfo()"'+(BUSY?' disabled':'')+'>'+(ed?'Update':'Simpan ke Cloud')+'</button>'+(ed?'<button class="btn g" onclick="cancelEdit()">Batal</button>':'')+'</div></div></div>';
+ }else if(MSG){h+='<div class="card no-print">'+msgHtml()+'</div>'}
  if(!D.info.length)h+='<div class="card mut">Belum ada informasi kampung.</div>';
  D.info.forEach(function(i){
   h+='<div class="card info"><b>'+esc(i.judul)+'</b> <span class="mut">· '+esc(i.tgl)+'</span><pre>'+esc(i.isi)+'</pre><button class="btn s" onclick="SHARE='+(SHARE===i.id?'null':i.id)+';render()">'+(SHARE===i.id?'Tutup Daftar WA':'Bagikan ke WA KK')+'</button> '+(A()?'<button class="btn g s" onclick="startEdit(\'info\','+i.id+')">Edit</button> <button class="btn r s" onclick="del(\'info\','+i.id+')">Hapus</button>':'')+'</div>';
   if(SHARE===i.id){
-   h+='<div class="card"><div class="sh"><b>Kirim ke masing-masing kepala keluarga</b><button class="btn g s" onclick="SHARE=null;render()">Tutup</button></div><div class="mut">Klik "Kirim WA" — WhatsApp terbuka dengan pesan siap kirim.</div>';
+   h+='<div class="card no-print"><div class="sh"><b>Kirim ke masing-masing kepala keluarga</b><button class="btn g s" onclick="SHARE=null;render()">Tutup</button></div><div class="mut">Klik "Kirim WA" — WhatsApp terbuka dengan pesan siap kirim.</div>';
    if(!D.kk.length){h+='<p class="mut">Belum ada data kepala keluarga.</p>'}
    D.kk.forEach(function(k){
     var hp=normHp(k.hp);
@@ -412,11 +575,11 @@ async function saveInfo(){
   if(EDIT&&EDIT.t==='info'){
    var r1=await sb.from('info').update({judul:judul,isi:isi}).eq('id',EDIT.id);
    if(r1.error)throw r1.error;
-   EDIT=null;setMsg('Informasi berhasil diperbarui.',true);
+   EDIT=null;setMsg('Informasi berhasil diperbarui & tersimpan.',true);
   }else{
    var r2=await sb.from('info').insert({judul:judul,isi:isi,tgl:today()});
    if(r2.error)throw r2.error;
-   setMsg('Informasi berhasil disimpan.',true);
+   setMsg('Informasi berhasil disimpan ke Supabase.',true);
   }
   await loadAll();
  }catch(e){setMsg('Gagal menyimpan info: '+(e.message||e))}
@@ -425,10 +588,10 @@ async function saveInfo(){
 
 function vDb(){
  var ed=(EDIT&&EDIT.t==='kk')?D.kk.find(function(x){return x.id===EDIT.id}):null;
- var h='<div class="card"><b>'+(ed?'Edit kepala keluarga':'Data kepala keluarga')+'</b><div class="row" style="margin-top:8px"><input id="dn" placeholder="Nama KK" value="'+esc(ed?ed.nama:'')+'"><input id="db" placeholder="Blok/No. rumah" value="'+esc(ed?ed.blok:'')+'"><input id="dh" placeholder="No. WA (0812... / 62812...)" value="'+esc(ed?ed.hp:'')+'"><button class="btn" onclick="saveKK()"'+(BUSY?' disabled':'')+'>'+(ed?'Update':'Tambah')+'</button>'+(ed?'<button class="btn g" onclick="cancelEdit()">Batal</button>':'')+'</div>'+msgHtml()+'</div>';
- h+='<div class="card tw"><table><tr><th>ID</th><th>Nama</th><th>Blok</th><th>No. WA</th><th>Aksi</th></tr>';
+ var h='<div class="card"><b>'+(ed?'Edit kepala keluarga':'Data kepala keluarga')+'</b><div class="row" style="margin-top:8px"><input id="dn" placeholder="Nama KK" value="'+esc(ed?ed.nama:'')+'"><input id="db" placeholder="Blok/No. rumah" value="'+esc(ed?ed.blok:'')+'"><input id="dh" placeholder="No. WA (0812... / 62812...)" value="'+esc(ed?ed.hp:'')+'"><button class="btn" onclick="saveKK()"'+(BUSY?' disabled':'')+'>'+(ed?'Update':'Tambah & Simpan')+'</button>'+(ed?'<button class="btn g" onclick="cancelEdit()">Batal</button>':'')+'</div>'+msgHtml()+'</div>';
+ h+='<div class="card tw"><table><tr><th>ID</th><th>Nama</th><th>Blok</th><th>No. WA</th><th class="act">Aksi</th></tr>';
  if(!D.kk.length)h+='<tr><td colspan="5" class="mut">Belum ada data KK.</td></tr>';
- D.kk.forEach(function(k){h+='<tr><td>'+k.id+'</td><td>'+esc(k.nama)+'</td><td>'+esc(k.blok)+'</td><td>'+esc(k.hp||'-')+'</td><td><button class="btn g s" onclick="startEdit(\'kk\','+k.id+')">Edit</button> <button class="btn r s" onclick="del(\'kk\','+k.id+')">Hapus</button></td></tr>'});
+ D.kk.forEach(function(k){h+='<tr><td>'+k.id+'</td><td>'+esc(k.nama)+'</td><td>'+esc(k.blok)+'</td><td>'+esc(k.hp||'-')+'</td><td class="act"><button class="btn g s" onclick="startEdit(\'kk\','+k.id+')">Edit</button> <button class="btn r s" onclick="del(\'kk\','+k.id+')">Hapus</button></td></tr>'});
  h+='</table></div>';
 
  h+='<div class="card tw"><b>Manajemen Akun & Peran (Super Admin / Lihat Saja)</b><p class="mut" style="margin:4px 0 8px">Atur peran pengguna terdaftar dan tautkan ke data KK (opsional untuk penanda jadwal ronda pribadi).</p><table><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Tautan KK</th><th>Aksi</th></tr>';
@@ -439,8 +602,60 @@ function vDb(){
  });
  h+='</table></div>';
 
- h+='<div class="card"><b>Ringkasan database</b><p class="mut">KK: '+D.kk.length+' · Transaksi kas: '+D.kas.length+' · Jadwal ronda: '+D.ronda.length+' · Pinjaman: '+D.pinjam.length+' · Informasi: '+D.info.length+'</p><div class="row"><button class="btn g" onclick="exp()">Salin data (JSON)</button>'+(!D.kk.length&&!D.kas.length&&!D.info.length?'<button class="btn" onclick="seedDemo()"'+(BUSY?' disabled':'')+'>Isi Data Contoh (Demo)</button>':'')+'</div><textarea id="ex" rows="5" style="display:none;margin-top:8px"></textarea><div id="dbMsg" class="mut" style="margin-top:6px"></div></div>';
+ h+='<div class="card"><b>Save / Backup & Restore Database</b><p class="mut">KK: '+D.kk.length+' · Transaksi kas: '+D.kas.length+' · Jadwal ronda: '+D.ronda.length+' · Pinjaman: '+D.pinjam.length+' · Informasi: '+D.info.length+'</p><div class="row"><button class="btn" onclick="saveBackupFile()">Save / Download Backup (.json)</button><button class="btn g" onclick="exp()">Salin JSON</button><button class="btn g" onclick="triggerRestore()">Restore dari File (.json)</button>'+(!D.kk.length&&!D.kas.length&&!D.info.length?'<button class="btn" onclick="seedDemo()"'+(BUSY?' disabled':'')+'>Isi Data Contoh (Demo)</button>':'')+'</div><input id="impFile" type="file" accept=".json,application/json" style="display:none" onchange="handleRestoreFile(this)"><textarea id="ex" rows="5" style="display:none;margin-top:8px"></textarea><div id="dbMsg" class="mut" style="margin-top:6px"></div></div>';
  return h;
+}
+
+function saveBackupFile(){
+ var payload=JSON.stringify({exported_at:new Date().toISOString(),kk:D.kk,kas:D.kas,ronda:D.ronda,pinjam:D.pinjam,info:D.info},null,2);
+ var fn='kampung-terpadu-backup-'+today()+'.json';
+ downloadFile(fn,payload,'application/json;charset=utf-8;');
+ var m=document.getElementById('dbMsg');
+ if(m)m.textContent='Backup berhasil disimpan ke perangkat: '+fn;
+}
+function triggerRestore(){var el=document.getElementById('impFile');if(el){el.value='';el.click()}}
+function handleRestoreFile(inp){
+ var file=inp&&inp.files&&inp.files[0];if(!file)return;
+ var r=new FileReader();
+ r.onload=function(){restoreFromJsonText(String(r.result||''))};
+ r.readAsText(file);
+}
+async function restoreFromJsonText(raw){
+ var m=document.getElementById('dbMsg');
+ try{
+  var p=JSON.parse(raw);
+  if(!p||!Array.isArray(p.kk)||!Array.isArray(p.kas)||!Array.isArray(p.ronda)||!Array.isArray(p.pinjam)||!Array.isArray(p.info))throw new Error('Format file backup tidak sesuai');
+  if(!confirm('Tambahkan data dari backup ('+p.kk.length+' KK, '+p.kas.length+' kas, '+p.ronda.length+' ronda, '+p.pinjam.length+' pinjam, '+p.info.length+' info) ke Supabase?'))return;
+  BUSY=true;clearMsg();render();
+  var kkMap={};
+  if(p.kk.length){
+   var kkPay=p.kk.map(function(k){return{nama:String(k.nama||'Warga').trim()||'Warga',blok:String(k.blok||''),hp:normHp(k.hp)}});
+   var insK=await sb.from('kk').insert(kkPay).select('id').order('id',{ascending:true});
+   if(insK.error)throw insK.error;
+   p.kk.forEach(function(oldK,idx){if(insK.data[idx])kkMap[oldK.id]=insK.data[idx].id});
+  }
+  var jobs=[];
+  if(p.kas.length){
+   jobs.push(sb.from('kas').insert(p.kas.map(function(x){return{tgl:x.tgl||today(),ket:String(x.ket||'Transaksi'),jenis:x.jenis==='keluar'?'keluar':'masuk',jml:Math.max(1,Math.round(Number(x.jml)||1))}})));
+  }
+  var rondaRows=p.ronda.map(function(r){return{hari:r.hari,kk_id:kkMap[r.kk_id!=null?r.kk_id:r.kk]}}).filter(function(r){return r.kk_id&&HARI.indexOf(r.hari)>=0});
+  if(rondaRows.length)jobs.push(sb.from('ronda').insert(rondaRows));
+  var pinjamRows=p.pinjam.map(function(x){
+   var ten=Math.max(1,Math.floor(Number(x.tenor)||1)),byr=Math.min(ten,Math.max(0,Math.floor(Number(x.bayar)||0)));
+   return{kk_id:kkMap[x.kk_id!=null?x.kk_id:x.kk],tgl:x.tgl||today(),pokok:Math.max(1,Math.round(Number(x.pokok)||1)),tenor:ten,bunga:Math.max(0,Number(x.bunga)||0),bayar:byr};
+  }).filter(function(x){return x.kk_id});
+  if(pinjamRows.length)jobs.push(sb.from('pinjam').insert(pinjamRows));
+  if(p.info.length){
+   jobs.push(sb.from('info').insert(p.info.map(function(i){return{judul:String(i.judul||'Info'),isi:String(i.isi||'-'),tgl:i.tgl||today()}})));
+  }
+  var res=await Promise.all(jobs);
+  for(var j=0;j<res.length;j++){if(res[j].error)throw res[j].error}
+  setMsg('Backup berhasil dipulihkan ke Supabase.',true);
+  await loadAll();
+ }catch(e){
+  setMsg('Gagal restore: '+(e.message||e));
+  if(m)m.textContent='Gagal restore: '+(e.message||e);
+ }finally{BUSY=false;render()}
 }
 
 async function saveKK(){
@@ -451,11 +666,11 @@ async function saveKK(){
   if(EDIT&&EDIT.t==='kk'){
    var r1=await sb.from('kk').update({nama:nama,blok:blok,hp:hp}).eq('id',EDIT.id);
    if(r1.error)throw r1.error;
-   EDIT=null;setMsg('Data KK berhasil diperbarui.',true);
+   EDIT=null;setMsg('Data KK berhasil diperbarui & tersimpan.',true);
   }else{
    var r2=await sb.from('kk').insert({nama:nama,blok:blok,hp:hp});
    if(r2.error)throw r2.error;
-   setMsg('Data KK berhasil ditambahkan.',true);
+   setMsg('Data KK berhasil disimpan ke Supabase.',true);
   }
   await loadAll();
  }catch(e){setMsg('Gagal menyimpan KK: '+(e.message||e))}
@@ -472,7 +687,7 @@ async function saveProfile(pid){
   var r=await sb.from('profiles').update({role:role,kk_id:kk_id}).eq('id',pid);
   if(r.error)throw r.error;
   if(pid===U.id)U.kk_id=kk_id;
-  setMsg('Pengaturan akun berhasil diperbarui.',true);
+  setMsg('Pengaturan akun berhasil disimpan.',true);
   await loadAll();
  }catch(e){setMsg('Gagal memperbarui akun: '+(e.message||e))}
  finally{BUSY=false;render()}
