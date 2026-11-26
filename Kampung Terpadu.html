@@ -314,12 +314,6 @@ function loginView(){
  h+=msgHtml()+'<button class="btn" type="submit" style="width:100%;margin-top:10px"'+(BUSY||!cfg.ready?' disabled':'')+'>'+(BUSY?'Memproses...':(AUTH_MODE==='login'?'Masuk':'Daftar (Akun Lihat Saja)'))+'</button></form>';
  if(AUTH_MODE==='signup'){h+='<p class="mut" style="margin-top:10px">Akun yang mendaftar otomatis hanya bisa melihat data. Hak Super Admin diberikan lewat database/Super Admin.</p>'}
  h+='<hr style="border:0;border-top:1px solid var(--bd);margin:16px 0 12px"><div><b>Mode Demo (Presentasi Pengurus RT)</b><p class="mut" style="margin:2px 0 8px">Coba seluruh fitur dengan data dummy tanpa perlu akun & tanpa mengubah data asli:</p><div class="row"><button type="button" class="btn g s" onclick="startDemo(\'super_admin\')">Coba Demo Super Admin</button><button type="button" class="btn g s" onclick="startDemo(\'viewer\')">Coba Demo Warga (Lihat Saja)</button></div></div>';
- if(cfg.ready){
-  h+='<div style="margin-top:12px;text-align:right"><button type="button" class="btn g s" onclick="CFG_OPEN=!CFG_OPEN;render()">'+(CFG_OPEN?'Tutup Pengaturan':'Ubah Koneksi Supabase')+'</button></div>';
-  if(CFG_OPEN){
-   h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><input id="cfgUrl" value="'+esc(cfg.url)+'"><br><br><input id="cfgKey" value="'+esc(cfg.key)+'"><br><br><button type="button" class="btn s" onclick="saveCfg()">Simpan Koneksi</button></div>';
-  }
- }
  return h+'</div>';
 }
 
