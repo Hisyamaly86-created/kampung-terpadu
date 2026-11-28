@@ -76,7 +76,7 @@ var SUPABASE_URL = 'https://dsumoijsbbtghtcfuqic.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_CQruiFI-fBB8t1VCeK5ScQ_IMP_F7UM';
 
 var CFG_KEY='kampung_terpadu_sb_cfg',TAB_KEY='kampung_terpadu_tab',DEMO_KEY='kampung_terpadu_demo_v1';
-var sb=null,U=null,TAB='beranda',MENU=false,SHARE=null,EDIT=null,MSG='',MSG_OK=false,AUTH_MODE='login',BUSY=false,CFG_OPEN=false,DEMO=false;
+var sb=null,U=null,TAB='beranda',MENU=false,SHARE=null,EDIT=null,PAY_ID=null,PINJAM_HIST=null,MSG='',MSG_OK=false,AUTH_MODE='login',BUSY=false,CFG_OPEN=false,DEMO=false;
 var D={kk:[],kas:[],ronda:[],pinjam:[],info:[],profiles:[]};
 var HARI=['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
 var KF={from:'',to:''};
@@ -144,7 +144,7 @@ function startDemo(role){
  U=role==='super_admin'
   ?{id:'demo-admin',email:'ketua-rt@demo.id',nama:'Ketua RT (Demo)',role:'super_admin',kk_id:1}
   :{id:'demo-warga',email:'warga@demo.id',nama:'Warga RT 03 (Demo)',role:'viewer',kk_id:1};
- TAB='beranda';EDIT=null;SHARE=null;MENU=false;
+ TAB='beranda';EDIT=null;PAY_ID=null;PINJAM_HIST=null;SHARE=null;MENU=false;
  setMsg('Mode Demo aktif (menggunakan data dummy lokal, tidak mengubah database asli).',true);
  render();window.scrollTo(0,0);
 }
@@ -282,12 +282,12 @@ async function doAuth(){
 
 async function logout(){
  if(!DEMO&&sb){try{await sb.auth.signOut()}catch(e){}}
- DEMO=false;U=null;SHARE=null;MENU=false;EDIT=null;D={kk:[],kas:[],ronda:[],pinjam:[],info:[],profiles:[]};
+ DEMO=false;U=null;SHARE=null;MENU=false;EDIT=null;PAY_ID=null;PINJAM_HIST=null;D={kk:[],kas:[],ronda:[],pinjam:[],info:[],profiles:[]};
  clearMsg();render();
 }
 
 function toggleMenu(){MENU=!MENU;render()}
-function go(t){if(t==='db'&&!A())t='beranda';TAB=t;SHARE=null;MENU=false;EDIT=null;clearMsg();saveTab();render();window.scrollTo(0,0)}
+function go(t){if(t==='db'&&!A())t='beranda';TAB=t;SHARE=null;MENU=false;EDIT=null;PAY_ID=null;PINJAM_HIST=null;clearMsg();saveTab();render();window.scrollTo(0,0)}
 
 function render(){
  var el=document.getElementById('app');
@@ -567,57 +567,181 @@ async function addRonda(){
 }
 
 function vPinjam(){
- var h='';
+ var h='',totAktif=0,totTagihan=0,totPaid=0,totSisa=0;
+ D.pinjam.forEach(function(p){
+  var tenor=Math.max(1,Number(p.tenor)||1),bayarVal=Math.min(tenor,Math.max(0,Number(p.bayar)||0));
+  var a=ang(p),sisa=a*Math.max(0,tenor-bayarVal),tag=a*tenor;
+  if(bayarVal<tenor)totAktif++;
+  totTagihan+=tag;totSisa+=sisa;totPaid+=Math.max(0,tag-sisa);
+ });
+ h+='<div class="grid"><div class="card stat"><b>'+totAktif+'</b><span>Pinjaman aktif</span></div><div class="card stat"><b>'+rp(totTagihan)+'</b><span>Total tagihan</span></div><div class="card stat"><b class="in">'+rp(totPaid)+'</b><span>Sudah terbayar</span></div><div class="card stat"><b class="'+(totSisa>0?'out':'in')+'">'+rp(totSisa)+'</b><span>Sisa tagihan</span></div></div>';
  if(A()){
+  var ed=(EDIT&&EDIT.t==='pinjam')?D.pinjam.find(function(x){return x.id===EDIT.id}):null;
   if(!D.kk.length){
    h+='<div class="card no-print"><b>Pinjaman baru</b><p class="mut" style="margin:6px 0 0">Belum ada data KK. Tambahkan KK terlebih dahulu di menu Database.</p></div>';
   }else{
-   h+='<div class="card no-print"><b>Pinjaman baru</b><div class="row" style="margin-top:8px"><select id="pk">'+kkOpt()+'</select><input id="pp" type="number" min="1" placeholder="Pokok (Rp)"><input id="pt" type="number" min="1" step="1" placeholder="Tenor (bulan)"><input id="pb" type="number" min="0" step="any" placeholder="Jasa total % (0 = tanpa)" value="0"><button class="btn" onclick="addPinjam()"'+(BUSY?' disabled':'')+'>Simpan ke Cloud</button></div>'+msgHtml()+'</div>';
+   h+='<div class="card no-print"><b>'+(ed?'Edit Data Pinjaman ('+esc(nm(ed.kk_id))+')':'Tambah Pinjaman Baru')+'</b><div class="row" style="margin-top:8px">';
+   h+='<div><label class="mut">Peminjam (KK)</label><select id="pk">'+kkOpt(ed?ed.kk_id:null)+'</select></div>';
+   h+='<div><label class="mut">Tanggal Pinjam</label><input id="ptgl" type="date" value="'+esc(ed?ed.tgl:today())+'"></div>';
+   h+='<div><label class="mut">Pokok (Rp)</label><input id="pp" type="number" min="1" placeholder="Mis. 1000000" value="'+esc(ed?ed.pokok:'')+'"></div>';
+   h+='<div><label class="mut">Tenor (bulan)</label><input id="pt" type="number" min="1" step="1" placeholder="Mis. 10" value="'+esc(ed?ed.tenor:'')+'"></div>';
+   h+='<div><label class="mut">Jasa Total (%)</label><input id="pb" type="number" min="0" step="any" placeholder="0 = tanpa jasa" value="'+esc(ed?ed.bunga:0)+'"></div>';
+   if(ed){
+    h+='<div><label class="mut">Terbayar (x)</label><input id="pbayar" type="number" min="0" step="1" value="'+esc(ed.bayar)+'"></div>';
+   }
+   h+='</div>';
+   if(!ed){
+    h+='<label class="mut" style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer"><input id="pcair" type="checkbox" style="width:auto"> Catat pencairan pinjaman sebagai pengeluaran di Kas RT</label>';
+   }else{
+    h+='<p class="mut" style="margin:6px 0 0">Tip: Ubah <b>Terbayar (x)</b> untuk mengoreksi jumlah angsuran secara langsung, atau gunakan tombol <b>+ Bayar</b> di tabel agar otomatis masuk Kas RT.</p>';
+   }
+   h+='<div class="row" style="margin-top:10px"><button class="btn" onclick="savePinjam()"'+(BUSY?' disabled':'')+'>'+(ed?'Simpan Perubahan':'Simpan Pinjaman')+'</button>'+(ed?'<button class="btn g" onclick="cancelEdit()">Batal</button>':'')+'</div>'+msgHtml()+'</div>';
   }
- }else if(MSG){h+='<div class="card no-print">'+msgHtml()+'</div>'}
- h+='<div class="card tw"><table><tr><th>Peminjam</th><th>Tanggal</th><th>Pokok</th><th>Angsuran/bln</th><th>Terbayar</th><th>Sisa</th><th>Progres</th>'+(A()?'<th class="act">Aksi</th>':'')+'</tr>';
- if(!D.pinjam.length)h+='<tr><td colspan="'+(A()?8:7)+'" class="mut">Belum ada data pinjaman.</td></tr>';
+  var payP=PAY_ID?D.pinjam.find(function(x){return x.id===PAY_ID}):null;
+  if(payP&&payP.bayar<payP.tenor){
+   var remPay=Math.max(1,(Number(payP.tenor)||1)-(Number(payP.bayar)||0));
+   var defNom=ang(payP);
+   h+='<div class="card no-print" style="border-left:4px solid var(--pri)"><div class="sh"><b>Catat Pembayaran Angsuran — '+esc(nm(payP.kk_id))+'</b><button class="btn g s" onclick="PAY_ID=null;render()">Tutup</button></div>';
+   h+='<p class="mut" style="margin:4px 0 8px">Sudah terbayar: <b>'+payP.bayar+' / '+payP.tenor+'</b> · Sisa: <b>'+remPay+'x</b> (Angsuran standar: <b>'+rp(defNom)+'</b>/bln)</p>';
+   h+='<div class="row">';
+   h+='<div><label class="mut">Tanggal Bayar</label><input id="payTgl" type="date" value="'+esc(today())+'"></div>';
+   h+='<div><label class="mut">Jumlah Angsuran</label><select id="payQty" onchange="updatePayPreview('+defNom+')">';
+   for(var qi=1;qi<=remPay;qi++){h+='<option value="'+qi+'">'+qi+'x (ke-'+(payP.bayar+1)+(qi>1?' s/d ke-'+(payP.bayar+qi):'')+')'+(qi===remPay?' — Lunas':'')+'</option>'}
+   h+='</select></div>';
+   h+='<div><label class="mut">Nominal per Angsuran (Rp)</label><input id="payNom" type="number" min="1" value="'+defNom+'" oninput="updatePayPreview('+defNom+')"></div>';
+   h+='</div>';
+   h+='<label class="mut" style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer"><input id="payKas" type="checkbox" checked style="width:auto"> Catat pemasukan angsuran ke Kas RT</label>';
+   h+='<div id="payTotalInfo" class="mut" style="margin-top:6px">Total dicatat: <b>'+rp(defNom)+'</b></div>';
+   h+='<div class="row" style="margin-top:10px"><button class="btn" onclick="submitBayar('+payP.id+')"'+(BUSY?' disabled':'')+'>Simpan Pembayaran</button><button class="btn g" onclick="PAY_ID=null;render()">Batal</button></div></div>';
+  }
+ }else{
+  h+='<div class="card no-print">'+(MSG?msgHtml():'')+'<p class="mut" style="margin:0">Anda login sebagai <b>Lihat Saja (Viewer)</b>. Pencatatan angsuran dan edit pinjaman hanya dapat dilakukan oleh <b>Super Admin</b>.</p></div>';
+ }
+ h+='<div class="card tw"><table><tr><th>Peminjam</th><th>Tanggal</th><th>Pokok</th><th>Jasa</th><th>Angsuran/bln</th><th>Terbayar</th><th>Sisa</th><th>Progres</th>'+(A()?'<th class="act">Aksi</th>':'')+'</tr>';
+ if(!D.pinjam.length)h+='<tr><td colspan="'+(A()?9:8)+'" class="mut">Belum ada data pinjaman.</td></tr>';
  D.pinjam.forEach(function(p){
   var tenor=Math.max(1,Number(p.tenor)||1),bayarVal=Math.max(0,Number(p.bayar)||0);
   var pc=Math.min(100,Math.max(0,Math.round(bayarVal/tenor*100)));
   var sisa=ang(p)*Math.max(0,tenor-bayarVal);
-  h+='<tr><td>'+esc(nm(p.kk_id))+'</td><td>'+esc(p.tgl)+'</td><td>'+rp(p.pokok)+'</td><td>'+rp(ang(p))+'</td><td>'+bayarVal+' / '+tenor+'</td><td>'+rp(sisa)+'</td><td><div class="bar"><i style="width:'+pc+'%"></i></div>'+(bayarVal>=tenor?'<span class="badge">Lunas</span>':'')+'</td>'+(A()?'<td class="act">'+(bayarVal<tenor?'<button class="btn s" onclick="bayar('+p.id+')"'+(BUSY?' disabled':'')+'>+ Angsuran</button> ':'')+(bayarVal>0?'<button class="btn g s" onclick="batalBayar('+p.id+')"'+(BUSY?' disabled':'')+'>−1</button> ':'')+'<button class="btn r s" onclick="del(\'pinjam\','+p.id+')">Hapus</button></td>':'')+'</tr>';
+  h+='<tr><td>'+esc(nm(p.kk_id))+'</td><td>'+esc(p.tgl)+'</td><td>'+rp(p.pokok)+'</td><td>'+(Number(p.bunga)||0)+'%</td><td>'+rp(ang(p))+'</td><td>'+bayarVal+' / '+tenor+'</td><td>'+rp(sisa)+'</td><td><div class="bar"><i style="width:'+pc+'%"></i></div>'+(bayarVal>=tenor?'<span class="badge">Lunas</span>':'')+'</td>'+(A()?'<td class="act">'+(bayarVal<tenor?'<button class="btn s" onclick="openPay('+p.id+')"'+(BUSY?' disabled':'')+'>+ Bayar</button> ':'')+(bayarVal>0?'<button class="btn g s" onclick="batalBayar('+p.id+')"'+(BUSY?' disabled':'')+' title="Batalkan 1 angsuran terakhir">−1</button> ':'')+'<button class="btn g s" onclick="togglePinjamHist('+p.id+')">Riwayat</button> <button class="btn g s" onclick="startEdit(\'pinjam\','+p.id+')">Edit</button> <button class="btn r s" onclick="del(\'pinjam\','+p.id+')">Hapus</button></td>':'')+'</tr>';
  });
- return h+'</table></div>';
+ h+='</table></div>';
+ if(A()&&PINJAM_HIST){
+  var hp=D.pinjam.find(function(x){return x.id===PINJAM_HIST});
+  if(hp){
+   var hRows=getPinjamKasRows(hp);
+   h+='<div class="card no-print"><div class="sh"><b>Riwayat Angsuran di Kas RT — '+esc(nm(hp.kk_id))+'</b><button class="btn g s" onclick="PINJAM_HIST=null;render()">Tutup</button></div>';
+   if(!hRows.length){
+    h+='<p class="mut" style="margin:6px 0 0">Belum ada catatan transaksi angsuran di Kas RT untuk pinjaman ini'+(hp.bayar>0?' (data awal tercatat '+hp.bayar+'x bayar sebelum pencatatan kas)':'')+'.</p>';
+   }else{
+    h+='<div class="tw" style="margin-top:8px"><table><tr><th>Tanggal</th><th>Keterangan</th><th>Nominal</th><th class="act">Aksi</th></tr>';
+    hRows.forEach(function(k){
+     h+='<tr><td>'+esc(k.tgl)+'</td><td>'+esc(k.ket)+'</td><td class="in">+'+rp(k.jml)+'</td><td class="act"><button class="btn g s" onclick="goKasEdit('+k.id+')">Edit di Kas</button></td></tr>';
+    });
+    h+='</table></div>';
+   }
+   h+='</div>';
+  }
+ }
+ return h;
 }
 
-async function addPinjam(){
- var kk_id=Number(v('pk')),pokok=Math.round(Number(v('pp'))),tenor=Math.floor(Number(v('pt'))),bunga=Number(v('pb'));
+function getPinjamKasRows(p){
+ var prefix='Angsuran '+nm(p.kk_id)+' ke-';
+ var prefixRaw='Angsuran '+(D.kk.find(function(x){return x.id==p.kk_id})||{}).nama;
+ return D.kas.filter(function(x){
+  if(x.jenis!=='masuk')return false;
+  if(x.ref_pinjam!=null&&Number(x.ref_pinjam)===Number(p.id))return true;
+  return String(x.ket||'').indexOf(prefix)===0||(prefixRaw&&String(x.ket||'').indexOf(prefixRaw+' ke-')===0);
+ });
+}
+function togglePinjamHist(id){PINJAM_HIST=(PINJAM_HIST===id?null:id);render()}
+function goKasEdit(kasId){TAB='kas';EDIT={t:'kas',id:kasId};PAY_ID=null;PINJAM_HIST=null;clearMsg();saveTab();render();window.scrollTo(0,0)}
+function openPay(id){PAY_ID=(PAY_ID===id?null:id);EDIT=null;clearMsg();render();if(PAY_ID)window.scrollTo(0,0)}
+function updatePayPreview(defNom){
+ var qty=Math.max(1,Math.floor(Number(v('payQty'))||1));
+ var nom=Math.max(0,Math.round(Number(v('payNom'))||0));
+ var el=document.getElementById('payTotalInfo');
+ if(el)el.innerHTML='Total dicatat: <b>'+rp(qty*nom)+'</b> ('+qty+' × '+rp(nom)+')';
+}
+
+async function savePinjam(){
+ var ed=(EDIT&&EDIT.t==='pinjam')?D.pinjam.find(function(x){return x.id===EDIT.id}):null;
+ var kk_id=Number(v('pk')),tgl=v('ptgl')||today(),pokok=Math.round(Number(v('pp'))),tenor=Math.floor(Number(v('pt'))),bunga=Number(v('pb'));
+ var bayarVal=ed?Math.floor(Number(v('pbayar'))):0;
+ var cairEl=document.getElementById('pcair'),catatCair=!!(!ed&&cairEl&&cairEl.checked);
  if(!kk_id||!D.kk.some(function(k){return k.id===kk_id})){setMsg('Pilih peminjam yang valid.');render();return}
  if(!Number.isFinite(pokok)||pokok<=0){setMsg('Pokok pinjaman harus lebih dari 0.');render();return}
  if(!Number.isFinite(tenor)||tenor<1){setMsg('Tenor minimal 1 bulan.');render();return}
  if(!Number.isFinite(bunga)||bunga<0){setMsg('Jasa (%) tidak boleh negatif.');render();return}
- if(DEMO){D.pinjam.push({id:demoNid('pinjam'),kk_id:kk_id,tgl:today(),pokok:pokok,tenor:tenor,bunga:bunga,bayar:0});saveDemoData();setMsg('Pinjaman demo disimpan.',true);render();return}
+ if(ed&&(!Number.isFinite(bayarVal)||bayarVal<0||bayarVal>tenor)){setMsg('Jumlah angsuran terbayar harus antara 0 s/d '+tenor+'.');render();return}
+ if(DEMO){
+  if(ed){
+   ed.kk_id=kk_id;ed.tgl=tgl;ed.pokok=pokok;ed.tenor=tenor;ed.bunga=bunga;ed.bayar=bayarVal;
+   EDIT=null;setMsg('Data pinjaman demo diperbarui.',true);
+  }else{
+   var nid=demoNid('pinjam');
+   D.pinjam.push({id:nid,kk_id:kk_id,tgl:tgl,pokok:pokok,tenor:tenor,bunga:bunga,bayar:0});
+   if(catatCair)D.kas.unshift({id:demoNid('kas'),tgl:tgl,ket:'Pencairan pinjaman '+nm(kk_id),jenis:'keluar',jml:pokok,ref_pinjam:nid});
+   setMsg('Pinjaman demo disimpan.',true);
+  }
+  saveDemoData();render();return;
+ }
  BUSY=true;clearMsg();render();
  try{
-  var r=await sb.from('pinjam').insert({kk_id:kk_id,tgl:today(),pokok:pokok,tenor:tenor,bunga:bunga,bayar:0});
-  if(r.error)throw r.error;
-  setMsg('Pinjaman baru tersimpan ke Supabase.',true);
+  if(ed){
+   var r1=await sb.from('pinjam').update({kk_id:kk_id,tgl:tgl,pokok:pokok,tenor:tenor,bunga:bunga,bayar:bayarVal}).eq('id',ed.id);
+   if(r1.error)throw r1.error;
+   EDIT=null;setMsg('Data pinjaman berhasil diperbarui & tersimpan ke Supabase.',true);
+  }else{
+   var r2=await sb.from('pinjam').insert({kk_id:kk_id,tgl:tgl,pokok:pokok,tenor:tenor,bunga:bunga,bayar:0}).select('id').single();
+   if(r2.error)throw r2.error;
+   if(catatCair){
+    var rk=await sb.from('kas').insert({tgl:tgl,ket:'Pencairan pinjaman '+nm(kk_id),jenis:'keluar',jml:pokok,ref_pinjam:r2.data?r2.data.id:null});
+    if(rk.error)throw rk.error;
+   }
+   setMsg('Pinjaman baru tersimpan ke Supabase.',true);
+  }
   await loadAll();
  }catch(e){setMsg('Gagal menyimpan pinjaman: '+(e.message||e))}
  finally{BUSY=false;render()}
 }
 
-async function bayar(id){
+async function submitBayar(id){
  var p=D.pinjam.find(function(x){return x.id===id});
  if(!p||p.bayar>=p.tenor)return;
- var nom=ang(p);
- if(!confirm('Catat angsuran ke-'+(p.bayar+1)+' untuk '+nm(p.kk_id)+' sebesar '+rp(nom)+'?'))return;
+ var rem=Math.max(1,(Number(p.tenor)||1)-(Number(p.bayar)||0));
+ var tgl=v('payTgl')||today();
+ var qty=Math.min(rem,Math.max(1,Math.floor(Number(v('payQty'))||1)));
+ var nom=Math.round(Number(v('payNom')));
+ var kasEl=document.getElementById('payKas'),catatKas=!!(kasEl&&kasEl.checked);
+ if(catatKas&&(!Number.isFinite(nom)||nom<=0)){setMsg('Nominal angsuran harus lebih dari 0.');render();return}
  if(DEMO){
-  p.bayar++;
-  D.kas.unshift({id:demoNid('kas'),tgl:today(),ket:'Angsuran '+nm(p.kk_id)+' ke-'+p.bayar,jenis:'masuk',jml:nom,ref_pinjam:p.id,ref_ke:p.bayar});
-  saveDemoData();setMsg('Angsuran demo tercatat ke kas RT.',true);render();return;
+  for(var i=1;i<=qty;i++){
+   p.bayar++;
+   if(catatKas)D.kas.unshift({id:demoNid('kas'),tgl:tgl,ket:'Angsuran '+nm(p.kk_id)+' ke-'+p.bayar,jenis:'masuk',jml:nom,ref_pinjam:p.id,ref_ke:p.bayar});
+  }
+  PAY_ID=null;saveDemoData();setMsg('Pembayaran '+qty+'x angsuran demo berhasil dicatat.',true);render();return;
  }
  BUSY=true;clearMsg();render();
  try{
-  var r=await sb.rpc('bayar_angsuran',{p_pinjam_id:id,p_tgl:today()});
-  if(r.error)throw r.error;
-  setMsg('Angsuran tercatat & tersimpan ke kas RT.',true);
+  if(catatKas&&qty===1&&nom===ang(p)){
+   var r=await sb.rpc('bayar_angsuran',{p_pinjam_id:id,p_tgl:tgl});
+   if(r.error)throw r.error;
+  }else{
+   var oldBayar=Number(p.bayar)||0,newBayar=Math.min(Number(p.tenor)||1,oldBayar+qty);
+   var up=await sb.from('pinjam').update({bayar:newBayar}).eq('id',id);
+   if(up.error)throw up.error;
+   if(catatKas){
+    var kasRows=[];
+    for(var j=1;j<=qty;j++){
+     kasRows.push({tgl:tgl,ket:'Angsuran '+nm(p.kk_id)+' ke-'+(oldBayar+j),jenis:'masuk',jml:nom,ref_pinjam:id,ref_ke:oldBayar+j});
+    }
+    var ins=await sb.from('kas').insert(kasRows);
+    if(ins.error)throw ins.error;
+   }
+  }
+  PAY_ID=null;setMsg('Pembayaran '+qty+'x angsuran berhasil dicatat'+(catatKas?' & masuk ke Kas RT.':' (tanpa catatan kas).'),true);
   await loadAll();
  }catch(e){setMsg('Gagal mencatat angsuran: '+(e.message||e))}
  finally{BUSY=false;render()}
@@ -876,7 +1000,7 @@ async function seedDemo(){
  finally{BUSY=false;render()}
 }
 
-function startEdit(t,id){EDIT={t:t,id:id};clearMsg();render();window.scrollTo(0,0)}
+function startEdit(t,id){EDIT={t:t,id:id};PAY_ID=null;clearMsg();render();window.scrollTo(0,0)}
 function cancelEdit(){EDIT=null;clearMsg();render()}
 
 function exp(){
@@ -895,11 +1019,20 @@ async function del(t,id){
   var cp=D.pinjam.filter(function(p){return p.kk_id===id}).length;
   if(cr||cp)warn='Hapus KK ini? '+cr+' jadwal ronda dan '+cp+' data pinjaman milik KK ini juga akan ikut terhapus.';
  }
+ if(t==='pinjam'){
+  var hp=D.pinjam.find(function(x){return x.id===id});
+  if(hp){
+   var kc=getPinjamKasRows(hp).length;
+   if(kc)warn='Hapus data pinjaman ini? ('+kc+' riwayat angsuran di Kas RT akan tetap tersimpan di Kas RT).';
+  }
+ }
  if(!confirm(warn))return;
  if(DEMO){
   D[t]=D[t].filter(function(x){return x.id!==id});
   if(t==='kk'){D.ronda=D.ronda.filter(function(r){return r.kk_id!==id});D.pinjam=D.pinjam.filter(function(p){return p.kk_id!==id})}
   if(EDIT&&EDIT.t===t&&EDIT.id===id)EDIT=null;
+  if(t==='pinjam'&&PAY_ID===id)PAY_ID=null;
+  if(t==='pinjam'&&PINJAM_HIST===id)PINJAM_HIST=null;
   saveDemoData();setMsg('Data demo dihapus.',true);render();return;
  }
  BUSY=true;clearMsg();render();
@@ -907,6 +1040,8 @@ async function del(t,id){
   var r=await sb.from(t).delete().eq('id',id);
   if(r.error)throw r.error;
   if(EDIT&&EDIT.t===t&&EDIT.id===id)EDIT=null;
+  if(t==='pinjam'&&PAY_ID===id)PAY_ID=null;
+  if(t==='pinjam'&&PINJAM_HIST===id)PINJAM_HIST=null;
   setMsg('Data berhasil dihapus.',true);
   await loadAll();
  }catch(e){setMsg('Gagal menghapus: '+(e.message||e))}
